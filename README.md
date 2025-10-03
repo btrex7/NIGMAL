@@ -124,7 +124,7 @@ Threat categories reflect IUCN assessments up to 2023.
 
 Data \& Code Availability:
 
-All files are available on Zenodo \[DOI to be inserted upon deposit].
+All files are available on Zenodo \[DOI](https://zenodo.org/badge/1069269813.svg)](https://doi.org/10.5281/zenodo.17259883).
 
 GitHub repository: \[https://github.com/btrex7/NIGMAL].
 
@@ -134,7 +134,7 @@ Citation:
 
 If using these data/code, please cite as:
 
-Asanbe, B. (2025). NIGMAL: A Dataset and R Code for Comparative Analyses of Mammalian Extinction Risk and Human Impacts in Nigeria. Zenodo. DOI: 
+Asanbe, B. (2025). NIGMAL: A Dataset and R Code for Comparative Analyses of Mammalian Extinction Risk and Human Impacts in Nigeria. Zenodo. DOI: https://doi.org/10.5281/zenodo.17259883
 
 
 
@@ -145,6 +145,7 @@ Faurby, S., Davis, M., Pedersen, R., Schowanek, S., Antonelli, A., \& Svenning, 
 IUCN (2025, January 12). The IUCN Red List Categories and Criteria. International Union for Conservation of Nature’s Red List database, 1(8), Retrieved 01/12/2025 from https://www.iucnredlist.org/
 
 Soria, C., Pacifici, M., Di Marco, M., Stephen, S., \& Rondinini, C. (2021). COMBINE: a coalesced mammal database of intrinsic and extrinsic traits. Ecology 102(6). https://doi.org/10.1002/ecy.3344
+
 
 
 
