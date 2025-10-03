@@ -1,0 +1,7 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: Asanbe
+  given-names: Bernard
+
+Asanbe, B. (2025). NIGMAL: A Dataset and R Code for Comparative Analyses of Mammalian Extinction Risk and Human Impacts in Nigeria. Zenodo. DOI: https://doi.org/10.5281/zenodo.17259883
