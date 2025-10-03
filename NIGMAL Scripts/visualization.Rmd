@@ -1,0 +1,154 @@
+---
+title: "visualization"
+author: "Bernard Asanbe"
+date: "2025"
+---
+
+```{r}
+
+# Load required libraries
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(scales)
+
+# Read the CSV file
+data <- read_csv("insert_file_path_here/Phyloglm_modelling_results.csv")
+
+# Filter out intercept rows
+data <- data %>% filter(Predictor != "(Intercept)")
+
+# Add significance labels: multiple asterisks based on p-values
+data <- data %>%
+  mutate(Significance = case_when(
+    Sig < 0.001 ~ "***",
+    Sig < 0.01 ~ "**",
+    Sig < 0.05 ~ "*",
+    TRUE ~ ""
+  ))
+
+# Order models, keeping "Total_Threat_Model" first
+models <- unique(data$Model)
+models <- c("Total_Threats_Model", setdiff(models, "Total_Threats_Model"))
+
+# Create a high-contrast color palette using varying luminance
+# Mix of dark and light tones for better contrast
+n_other <- length(models) - 1
+hues <- seq(15, 375, length.out = n_other + 1)[-1]
+luminances <- rep(c(40, 70), length.out = n_other)  # alternate luminance for contrast
+colorful_palette <- hcl(h = hues, c = 100, l = luminances)
+
+# Assign black to Total Threat Model, add colorful palette to others
+colors <- c("Total_Threats_Model" = "black")
+colors <- c(colors, setNames(colorful_palette, models[-1]))
+
+# Set factor levels to control order
+data$Model <- factor(data$Model, levels = models)
+
+
+```
+
+Plotting of Raw graph
+```{r}
+
+# Compute vertical position for asterisks
+data <- data %>%
+  mutate(asterisk_y = ifelse(Effect_size >= 0,
+                             Effect_size + SE + 0.05,
+                             Effect_size - SE - 0.1))
+
+# Build the final plot
+ggplot(data, aes(x = Predictor, y = Effect_size, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = Effect_size - SE, ymax = Effect_size + SE),
+                position = position_dodge(width = 0.8), width = 0.25) +
+  geom_text(aes(y = asterisk_y, label = Significance),
+            position = position_dodge(width = 0.8),
+            angle = 90,            # Upright asterisks
+            size = 6,
+            fontface = "bold",
+            color = "red3",
+            hjust = -0.05) +        # Shift slightly outward
+  labs(title = "Effect Sizes of Predictors by Threat Model",
+       y = "Effect Size", x = "Predictor", fill = "Threat Models") +
+  scale_fill_manual(values = colors) +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 14, hjust = 1),
+    axis.line = element_line(color = "black"),
+    axis.ticks = element_line(color = "black"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.position = "right"
+  )
+
+
+
+```
+
+Plotting of Standardized (scaled) graph
+```{r}
+
+# Compute vertical position for asterisks
+data <- data %>%
+  mutate(asterisk_y = ifelse(Std_Effect_size >= 0,
+                             Std_Effect_size + SE + 0.05,
+                             Std_Effect_size - SE - 0.1))
+
+# Build the final plot
+ggplot(data, aes(x = Predictor, y = Std_Effect_size, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = Std_Effect_size - Std_SE, ymax = Std_Effect_size + Std_SE),
+                position = position_dodge(width = 0.8), width = 0.25) +
+  geom_text(aes(y = asterisk_y, label = Significance),
+            position = position_dodge(width = 0.8),
+            angle = 90,            # Upright asterisks
+            size = 6,
+            fontface = "bold",
+            color = "red3",
+            hjust = -0.05) +        # Shift slightly outward
+  labs(title = "Standardized Effect Sizes of Predictors by Threat Model",
+       y = "Std Effect Size", x = "Predictor", fill = "Threat Models") +
+  scale_fill_manual(values = colors) +
+  theme_minimal(base_size = 18) +
+  theme(
+    axis.text.x = element_text(angle = 45, size = 14, hjust = 1),
+    axis.line = element_line(color = "black"),
+    axis.ticks = element_line(color = "black"),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    legend.position = "right"
+  )
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```
+
+```{r}
+
+
+
+```

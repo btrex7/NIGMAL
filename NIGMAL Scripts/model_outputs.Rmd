@@ -1,0 +1,144 @@
+---
+title: "model_outputs"
+author: "Bernard Asanbe"
+date: "2025"
+---
+
+Outputting the phylogenetic logistic regression model (from model_fitting)
+```{r}
+# ------------------------------------------------------------------------------
+# Creating binary response variable based on IUCN Red List status
+# ------------------------------------------------------------------------------
+# Threatened: CR, EN, VU; Not Threatened: LC, NT; Exclude or treat DD if needed
+
+data$ThreatStatus_bin <- ifelse(data$IUCNredlist_status %in% c("Critically Endangered", "Endangered", "Vulnerable"), 1, 0)
+
+# (Optional) If you want to exclude Data Deficient species from the analysis:
+data <- data[data$IUCNredlist_status != "Data Deficient", ]
+
+# Prune the tree to match species in the dataset
+species_in_data <- data$SCI_NAME
+tree <- drop.tip(tree, setdiff(tree$tip.label, species_in_data))
+
+# Check species alignment
+print(intersect(tree$tip.label, species_in_data))
+
+# Fit the phylogenetic logistic regression model
+full_phylo_model <- phyloglm(ThreatStatus_bin ~ Scaled_CurrentArea_TotalArea + 
+                               Scaled_Log_Current_Area_KM2 + 
+                               Scaled_Log_Mass_g + 
+                               Scaled_Log_Brain_Mass_g + 
+                               Scaled_Log_Generation_time_d, 
+                             data = data, 
+                             phy = tree, 
+                             method = "logistic_MPLE")
+
+# View model summary
+summary(full_phylo_model)
+
+# Save model
+save(full_phylo_model, file = "full_phylo_model.RData")
+
+# Save summary as text file
+sink("full_phylo_model_summary.txt")
+summary(full_phylo_model)
+sink()
+
+#.__________________________________________________________________________________
+#Running a separate phyloglm for each threat category, looping through each threat.
+#___________________________________________________________________________________
+
+threat_models <- list()  # Store models
+model_summaries <- list()  # List to store model summaries
+
+for (threat in threat_cols) {
+  # Create binary column for current threat
+  data$Threat_bin <- ifelse(data[[threat]] == "Yes", 1, 0)
+  
+  # Check if both 0 and 1 are present
+  if (length(unique(data$Threat_bin)) < 2) {
+    warning(paste("Skipping", threat, "- all responses are", unique(data$Threat_bin)))
+    next  # Skip to next iteration
+  }
+  
+  # Fit the model if there is variation
+  model <- phyloglm(Threat_bin ~ Scaled_CurrentArea_TotalArea + 
+                      Scaled_Log_Current_Area_KM2 + 
+                      Scaled_Log_Mass.g + 
+                      Scaled_Log_Brain_Mass_g + 
+                      Scaled_Log_Generation_time.d, 
+                    data = data, 
+                    phy = tree, 
+                    method = "logistic_MPLE")
+  
+  # Store results
+  threat_models[[threat]] <- model
+  model_summary <- capture.output(summary(model))
+  model_summaries[[threat]] <- paste("\n\n##### Threat Category:", threat, "#####\n", paste(model_summary, collapse = "\n"))
+}
+
+#Save results to a text file
+output_file <- "insert_file_path_here/Phylogenetic_Logistic_Models_Results.csv"
+writeLines(unlist(model_summaries), output_file)
+  
+  # Print summary of each model
+  cat("\n\n##### Threat Category:", threat, "#####\n")
+  print(summary(model))
+
+  
+#________________________________________________________________________________________
+#Creating data for number of species threatened by each of the 12 IUCN threat categories
+#________________________________________________________________________________________
+  
+  # Define output file
+  output_file <- "insert_file_path_here/Threatened_Species_By_Factor.txt"
+  
+  # Initialize a list to collect threat summaries
+  threat_summary <- list()
+  
+  # Loop through each threat column
+  for (threat in threat_cols) {
+    # Get species where the threat is marked as "Yes"
+    threatened_species <- data$SCI_NAME[data[[threat]] == "Yes"]
+    
+    # Count of threatened species
+    threat_count <- length(threatened_species)
+    
+    # Build the formatted text for this threat category
+    threat_text <- paste0("##### ", threat, " #####\n",
+                          "Number of threatened species: ", threat_count, "\n",
+                          "Species:\n",
+                          paste(threatened_species, collapse = "\n"))
+    
+    # Add to summary list
+    threat_summary[[threat]] <- threat_text
+  }
+  
+  # Combine all and write to file
+  writeLines(unlist(threat_summary), con = output_file)
+
+```
+
+Standardizing Effect_size and SE
+```{r}
+
+# Load the data
+df <- read_csv("insert_file_path_here/Phylogenetic_Logistic_Models_Results.csv")
+
+# Filter out intercepts
+df_scaled <- df %>%
+    group_by(Threat_Category_ID, Model) %>%
+  mutate(
+    max_effect = max(abs(Effect_size), na.rm = TRUE),
+    Scaled_Effect = Effect_size / max_effect,
+    Scaled_SE = SE / max_effect
+  ) %>%
+  select(-max_effect)
+
+# View the result
+print(df_scaled)
+
+# Save to CSV
+write_csv(df_scaled, "Phyloglm_modelling_results.csv")
+
+```

@@ -1,0 +1,120 @@
+---
+title: "model_fitting"
+author: "Bernard Asanbe"
+date: "2025"
+---
+
+Installation and loading of packages
+```{r}
+# Install required packages
+install.packages("ape")
+install.packages("phylolm")
+install.packages("dplyr")
+install.packages("car")
+install.packages("corrplot")
+
+# Load necessary libraries
+library(ape)
+library(phylolm)
+library(dplyr)
+library(car)
+library(corrplot)
+
+```
+
+Fitting the tree
+```{r}
+#Loading the pruned 'Phylogeny_tree.tre' 
+tree <- read.tree("insert_file_path_here/Phylogeny_tree.tre")
+
+#Checking if the tree is a multiPhylo (i.e., a list of trees)
+if (inherits(tree, "multiPhylo")) {
+  # Extract the first tree from the list
+  tree <- tree[[1]]
+}
+
+#View summary of the tree
+print(tree)
+
+```
+
+Fitting the data
+```{r}
+# Loading the species data
+data <- read.csv("insert_file_path_here/Nigerian_mammal_traits_threats.csv", header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+
+# Setting the row names to species names for easier matching.
+rownames(data) <- data$SCI_NAME
+
+# Defining the 12 threat columns (make sure these names exactly match your data)
+threat_cols <- c("1_Residential_&_commercial_development",
+                 "2_Agriculture_&_aquaculture",
+                 "3_Energy_production_&_mining",
+                 "4_Transportation_&_service_corridors",
+                 "5_Biological_resource_use",
+                 "6_Human_intrusions_&_disturbance",
+                 "7_Natural_system_modifications",
+                 "8_Invasive_and_other_problematic_species,_genes_&_diseases",
+                 "9_Pollution",
+                 "10_Geological_events",
+                 "11_Climate_change_&_severe_weather",
+                 "12_Other_options")
+
+# Verifying these columns exist in the data
+missing_cols <- setdiff(threat_cols, names(data))
+if (length(missing_cols) > 0) {
+  stop("The following columns are missing in your data: ",
+       paste(missing_cols, collapse = ", "))
+}
+
+# Creating a composite binary ThreatStatus variable:
+# If any of the 12 columns is "Yes", then ThreatStatus_bin is 1, otherwise 0.
+data$ThreatStatus_bin <- ifelse(rowSums(data[, threat_cols] == "Yes", na.rm = TRUE) > 0, 1, 0)
+
+
+#Ensuring the tree only contains species present.
+species_in_data <- data$SCI_NAME
+
+View(data)
+
+```
+
+Testing multicollinearity and correlation
+```{r}
+
+# Fit a multiple regression model including all predictors
+full_model <- lm(ThreatStatus_bin ~ Scaled_CurrentArea_TotalArea + Scaled_Log_Current_Area_KM2 + Scaled_Log_Mass.g + Scaled_Log_Brain_Mass_g + Scaled_Log_Generation_time.d, data = data)
+
+# Calculate VIF for each predictor
+vif_values <- vif(full_model)
+
+# Print VIF values
+print(vif_values)
+
+# Interpretation
+if(any(vif_values > 5)){
+  cat("Warning: Some predictors have high VIF (> 5), indicating multicollinearity.\n")
+} else {
+  cat("No serious multicollinearity detected (VIF < 5 for all predictors).\n")
+}
+
+#----------------------------------------------------------------------------------------------------------------------
+colnames(data)
+
+# Select the predictor columns
+predictor_data <- data[, c("Scaled_CurrentArea_TotalArea", "Scaled_Log_Current_Area_KM2", "Scaled_Log_Mass.g", "Scaled_Log_Brain_Mass_g", "Scaled_Log_Generation_time.d")]
+
+# Compute the correlation matrix
+cor_matrix <- cor(predictor_data, use = "pairwise.complete.obs")
+
+# Print correlation matrix
+print(cor_matrix)
+
+
+# Create a correlation heatmap
+corrplot(cor_matrix, method = "color", type = "upper", 
+         col = colorRampPalette(c("blue", "white", "red"))(200), 
+          addCoef.col = "black", tl.col = "black", tl.srt = 45, 
+         number.cex = 0.8, diag = FALSE)
+
+```

@@ -1,0 +1,223 @@
+---
+title: "Data_Cleaning"
+author: "Bernard Asanbe"
+date: "2025"
+---
+
+Installation and loading of packages
+```{r}
+# Installing required packages (only if not already installed)
+install.packages(c("sf", "readxl", "writexl", "dplyr"))
+
+# Load required packages
+library(sf)
+library(readxl)
+library(writexl)
+library(dplyr)
+
+```
+
+ETL for Species list from downloaded IUCN Red List data polygon
+```{r}
+
+# Define path to shapefile
+shapefile_path <- "insert_file_path_here/redlist_species_data/data_0.shp"
+
+# Read the shapefile
+iucn_data <- st_read(shapefile_path)
+
+# Remove geometry so we keep only attribute data
+iucn_table <- st_drop_geometry(iucn_data)
+
+# Remove duplicated species in SCI_NAME column, keeping the first occurrence
+iucn_unique <- iucn_table[!duplicated(iucn_table$SCI_NAME), ]
+
+# Save to CSV
+write.csv(iucn_unique, 
+          "insert_file_path_here/mammal_species_unique.csv", 
+          row.names = FALSE)
+
+```
+
+Matching traits with the SCI_NAME obs. of the IUCN data
+```{r}
+
+# Load the Excel file
+file_path <- "insert_file_path_here/Trait_data - Brain size and Repro_rate and all.xlsx"  # Change this to your file path
+
+# Read Sheet1 (Subset List)
+sheet1_data <- read_excel(file_path, sheet = "Sheet1", range = "A2:A320", col_names = FALSE)
+names(sheet1_data) <- c("Subset")
+
+# Read Sheet2 (Complete Data)
+sheet2_data <- read_excel(file_path, sheet = "Sheet2", col_names = TRUE)
+
+# Filter Sheet2 using Sheet1's subset list
+filtered_data <- sheet2_data %>%
+  filter(`IUCN scientific name` %in% sheet1_data$Subset)  # Change `ColumnB` to actual column name
+
+# Save the filtered data to a new sheet
+write_xlsx(filtered_data, "All filtered_data - Brain_n_Repro.xlsx")
+
+# View the result
+print(filtered_data)
+
+```
+
+Extraction of Geographical range from the polygon
+```{r}
+
+# Re-load shp file as spatial_data
+spatial_data <- st_read("insert_file_path_here\redlist_species_data_NEW/data_0.shp")
+
+# Filter the data
+panthera_data <- spatial_data %>%
+  filter(SCI_NAME == "Panthera leo")
+
+# Calculating the total geographical range in sq km
+panthera_data_utm <- st_transform(panthera_data, crs = 32633) # UTM zone for example
+
+# Calculating the area for each geometry in sq km
+panthera_data_utm$area_km2 <- st_area(panthera_data_utm) / 1e6  # Convert from m^2 to km^2
+
+# Sum the areas of all polygons for Panthera leo
+total_area_km2 <- sum(panthera_data_utm$area_km2, na.rm = TRUE)
+
+# Create a dataframe with the total area for export
+result <- data.frame(SCI_NAME = "Panthera leo", Total_Area_KM2 = total_area_km2)
+
+# Write result to a CSV file
+write.csv(result, "panthera_leo_total_range.csv", row.names = FALSE)
+
+
+
+##Creating the total current area in sq km
+
+# List of items to filter in LEGEND header
+items_to_filter <- c("Extant (resident)", "Extant & Reintroduced (resident)", "Possibly Extant (resident)")
+
+# Filtering
+current_panthera_data <- panthera_data %>%
+  filter(LEGEND %in% items_to_filter) 
+
+# Reprojecting
+current_panthera_data_utm <- st_transform(current_panthera_data, crs = 32633)
+
+# Calculate the area in sq km
+current_panthera_data_utm$area_km2 <- st_area(current_panthera_data_utm) / 1e6
+
+# Sum the areas of all polygons for the current geographical range
+current_total_area_km2 <- sum(current_panthera_data_utm$area_km2, na.rm = TRUE)
+
+# Create a dataframe with the total current range area for export
+current_result <- data.frame(SCI_NAME = "Panthera leo", Current_Area_KM2 = current_total_area_km2)
+
+# Write the result to a CSV file
+write.csv(current_result, "panthera_leo_current_range.csv", row.names = FALSE)
+
+
+
+#Creating the total Extinct area in sq km
+
+# List of items to filter in LEGEND header
+ex_items_to_filter <- c("Extinct", "Possibly Extinct")
+
+#Filtering
+extinct_panthera_data <- panthera_data %>%
+  filter(LEGEND %in% ex_items_to_filter)
+
+# Reprojecting
+extinct_panthera_data_utm <- st_transform(extinct_panthera_data, crs = 32633)
+
+# Calculate the area in sq km
+extinct_panthera_data_utm$area_km2 <- st_area(extinct_panthera_data_utm) / 1e6
+
+# Sum the areas of all polygons for the extinct geographical range
+extinct_total_area_km2 <- sum(extinct_panthera_data_utm$area_km2, na.rm = TRUE)
+
+# Create a dataframe with the total extinct range area for export
+extinct_result <- data.frame(SCI_NAME = "Panthera leo", Extinct_Area_KM2 = extinct_total_area_km2)
+
+# Write the result to a CSV file
+write.csv(extinct_result, "panthera_leo_extinct_range.csv", row.names = FALSE)
+
+# Write the result to a DOCX file
+write.docx(panthera_data_utm, "the combined area", row.names = FALSE)
+
+
+#----------------------------------------------------------------
+#LOOPING FOR THE ENTIRE DATASET
+#----------------------------------------------------------------
+
+# Reproject the entire dataset to UTM (saves time during the loop)
+spatial_data_utm <- st_transform(spatial_data, crs = 32633) # Adjust UTM zone as needed
+
+# Define filters for "current" and "extinct" ranges
+current_items_to_filter <- c("Extant (resident)", "Extant & Reintroduced (resident)", "Possibly Extant (resident)")
+extinct_items_to_filter <- c("Extinct", "Possibly Extinct", "Presence Uncertain")
+
+# Get a list of unique species names
+species_list <- unique(spatial_data$SCI_NAME)
+
+# Initialize a list to store results
+results <- list()
+
+# Loop through each species and calculate areas
+for (species in species_list) {
+  # Filter the data for the species
+  species_data <- spatial_data_utm %>%
+    filter(SCI_NAME == species)
+  
+  # Calculate the total geographical range
+  species_data$area_km2 <- st_area(species_data) / 1e6  # Area in km^2
+  total_area_km2 <- sum(species_data$area_km2, na.rm = TRUE)
+  
+  # Filter for current ranges
+  current_data <- species_data %>%
+    filter(LEGEND %in% current_items_to_filter)
+  current_data$area_km2 <- st_area(current_data) / 1e6
+  current_area_km2 <- sum(current_data$area_km2, na.rm = TRUE)
+  
+  # Filter for extinct ranges
+  extinct_data <- species_data %>%
+    filter(LEGEND %in% extinct_items_to_filter)
+  extinct_data$area_km2 <- st_area(extinct_data) / 1e6
+  extinct_area_km2 <- sum(extinct_data$area_km2, na.rm = TRUE)
+  
+  # Save results for the species
+  results[[species]] <- data.frame(
+    SCI_NAME = species,
+    Total_Area_KM2 = total_area_km2,
+    Current_Area_KM2 = current_area_km2,
+    Extinct_Area_KM2 = extinct_area_km2
+  )
+}
+
+# Combine all results into a single dataframe
+final_results <- do.call(rbind, results)
+
+# Write the final results to a CSV file
+write.csv(final_results, "species_geographical_ranges.csv", row.names = FALSE)
+
+
+```
+
+Log-transformation for each traits. i.e Brain_mass
+```{r}
+
+# Load the dataset
+file_path <- "insert_file_path_here/Trait_data - Brain_Mass.xlsx"
+data <- read_excel(file_path)
+
+# Check column names and scale log
+colnames(data)
+
+data$Scaled_Log_Brain_mass_g <- scale(log10(data$Brain_mass_g))
+
+# Save the modified dataset back to Excel
+write_xlsx(data, "scaled_log_BrainMass_g.xlsx")
+
+# Print summary
+summary(data$Brain_mass_g)
+
+```
