@@ -7,13 +7,14 @@ date: "2025"
 Installation and loading of packages
 ```{r}
 # Installing required packages (only if not already installed)
-install.packages(c("sf", "readxl", "writexl", "dplyr"))
+install.packages(c("sf", "readxl", "writexl", "dplyr", "terra"))
 
 # Load required packages
 library(sf)
 library(readxl)
 library(writexl)
 library(dplyr)
+library(terra)
 
 ```
 
@@ -70,133 +71,50 @@ Extraction of Geographical range from the polygon
 # Re-load shp file as spatial_data
 spatial_data <- st_read("insert_file_path_here\redlist_species_data_NEW/data_0.shp")
 
-# Filter the data
-panthera_data <- spatial_data %>%
-  filter(SCI_NAME == "Panthera leo")
+# Load shapefile as terra vector object (replaces st_read for area calculation)
+v <- vect("insert_file_path_here/redlist_species_data_NEW/data_0.shp")
 
-# Calculating the total geographical range in sq km
-panthera_data_utm <- st_transform(panthera_data, crs = 32633) # UTM zone for example
+# Define filters for current range
+current_items <- c("Extant (resident)",
+                   "Extant & Reintroduced (resident)",
+                   "Possibly Extant (resident)")
 
-# Calculating the area for each geometry in sq km
-panthera_data_utm$area_km2 <- st_area(panthera_data_utm) / 1e6  # Convert from m^2 to km^2
+# Define filters for extinct range
+extinct_items <- c("Extinct", "Possibly Extinct", "Presence Uncertain")
 
-# Sum the areas of all polygons for Panthera leo
-total_area_km2 <- sum(panthera_data_utm$area_km2, na.rm = TRUE)
+# Get unique species list
+species_list <- unique(v$SCI_NAME)
 
-# Create a dataframe with the total area for export
-result <- data.frame(SCI_NAME = "Panthera leo", Total_Area_KM2 = total_area_km2)
-
-# Write result to a CSV file
-write.csv(result, "panthera_leo_total_range.csv", row.names = FALSE)
-
-
-
-##Creating the total current area in sq km
-
-# List of items to filter in LEGEND header
-items_to_filter <- c("Extant (resident)", "Extant & Reintroduced (resident)", "Possibly Extant (resident)")
-
-# Filtering
-current_panthera_data <- panthera_data %>%
-  filter(LEGEND %in% items_to_filter) 
-
-# Reprojecting
-current_panthera_data_utm <- st_transform(current_panthera_data, crs = 32633)
-
-# Calculate the area in sq km
-current_panthera_data_utm$area_km2 <- st_area(current_panthera_data_utm) / 1e6
-
-# Sum the areas of all polygons for the current geographical range
-current_total_area_km2 <- sum(current_panthera_data_utm$area_km2, na.rm = TRUE)
-
-# Create a dataframe with the total current range area for export
-current_result <- data.frame(SCI_NAME = "Panthera leo", Current_Area_KM2 = current_total_area_km2)
-
-# Write the result to a CSV file
-write.csv(current_result, "panthera_leo_current_range.csv", row.names = FALSE)
-
-
-
-#Creating the total Extinct area in sq km
-
-# List of items to filter in LEGEND header
-ex_items_to_filter <- c("Extinct", "Possibly Extinct")
-
-#Filtering
-extinct_panthera_data <- panthera_data %>%
-  filter(LEGEND %in% ex_items_to_filter)
-
-# Reprojecting
-extinct_panthera_data_utm <- st_transform(extinct_panthera_data, crs = 32633)
-
-# Calculate the area in sq km
-extinct_panthera_data_utm$area_km2 <- st_area(extinct_panthera_data_utm) / 1e6
-
-# Sum the areas of all polygons for the extinct geographical range
-extinct_total_area_km2 <- sum(extinct_panthera_data_utm$area_km2, na.rm = TRUE)
-
-# Create a dataframe with the total extinct range area for export
-extinct_result <- data.frame(SCI_NAME = "Panthera leo", Extinct_Area_KM2 = extinct_total_area_km2)
-
-# Write the result to a CSV file
-write.csv(extinct_result, "panthera_leo_extinct_range.csv", row.names = FALSE)
-
-# Write the result to a DOCX file
-write.docx(panthera_data_utm, "the combined area", row.names = FALSE)
-
-
-#----------------------------------------------------------------
-#LOOPING FOR THE ENTIRE DATASET
-#----------------------------------------------------------------
-
-# Reproject the entire dataset to UTM (saves time during the loop)
-spatial_data_utm <- st_transform(spatial_data, crs = 32633) # Adjust UTM zone as needed
-
-# Define filters for "current" and "extinct" ranges
-current_items_to_filter <- c("Extant (resident)", "Extant & Reintroduced (resident)", "Possibly Extant (resident)")
-extinct_items_to_filter <- c("Extinct", "Possibly Extinct", "Presence Uncertain")
-
-# Get a list of unique species names
-species_list <- unique(spatial_data$SCI_NAME)
-
-# Initialize a list to store results
-results <- list()
-
-# Loop through each species and calculate areas
-for (species in species_list) {
-  # Filter the data for the species
-  species_data <- spatial_data_utm %>%
-    filter(SCI_NAME == species)
+# Loop through each species using lapply
+results <- lapply(species_list, function(sp) {
   
-  # Calculate the total geographical range
-  species_data$area_km2 <- st_area(species_data) / 1e6  # Area in km^2
-  total_area_km2 <- sum(species_data$area_km2, na.rm = TRUE)
+  sub <- v[v$SCI_NAME == sp, ]
   
-  # Filter for current ranges
-  current_data <- species_data %>%
-    filter(LEGEND %in% current_items_to_filter)
-  current_data$area_km2 <- st_area(current_data) / 1e6
-  current_area_km2 <- sum(current_data$area_km2, na.rm = TRUE)
+  # Total geographic area (all polygons)
+  total_km2 <- sum(expanse(sub, unit = "km", transform = TRUE))
   
-  # Filter for extinct ranges
-  extinct_data <- species_data %>%
-    filter(LEGEND %in% extinct_items_to_filter)
-  extinct_data$area_km2 <- st_area(extinct_data) / 1e6
-  extinct_area_km2 <- sum(extinct_data$area_km2, na.rm = TRUE)
+  # Current area (extant polygons only)
+  current <- sub[sub$LEGEND %in% current_items, ]
+  current_km2 <- if (nrow(current) > 0)
+    sum(expanse(current, unit = "km", transform = TRUE)) else 0
   
-  # Save results for the species
-  results[[species]] <- data.frame(
-    SCI_NAME = species,
-    Total_Area_KM2 = total_area_km2,
-    Current_Area_KM2 = current_area_km2,
-    Extinct_Area_KM2 = extinct_area_km2
+  # Extinct area
+  extinct <- sub[sub$LEGEND %in% extinct_items, ]
+  extinct_km2 <- if (nrow(extinct) > 0)
+    sum(expanse(extinct, unit = "km", transform = TRUE)) else 0
+  
+  data.frame(
+    SCI_NAME       = sp,
+    Total_Area_KM2   = total_km2,
+    Current_Area_KM2 = current_km2,
+    Extinct_Area_KM2 = extinct_km2
   )
-}
+})
 
 # Combine all results into a single dataframe
 final_results <- do.call(rbind, results)
 
-# Write the final results to a CSV file
+# Write to CSV
 write.csv(final_results, "species_geographical_ranges.csv", row.names = FALSE)
 
 
