@@ -45,6 +45,53 @@ colors <- c(colors, setNames(colorful_palette, models[-1]))
 # Set factor levels to control order
 data$Model <- factor(data$Model, levels = models)
 
+# Clean up Predictor labels (x-axis)
+data$Predictor <- recode(data$Predictor,
+                         "Scaled_CurrentByTotalArea_km2"  = "Historical Range Contraction",
+                         "Scaled_Log_Brain_Mass_g"        = "Brain Mass",
+                         "Scaled_Log_CurrentArea_km2"    = "Current Area (km²)",
+                         "Scaled_Log_GenerationTime_d"    = "Generation Time",
+                         "Scaled_Log_Mass_g"              = "Body Mass",
+                         
+)
+
+# Clean up Model labels (legend)
+data$Model <- recode(as.character(data$Model),
+                     "Total_Threats_Model"                    = "Total Threats Model",
+                     "Agriculture_&_aquaculture"              = "Agriculture & Aquaculture",
+                     "Biological_resource_use"                = "Biological Resource Use",
+                     "Residential_&_commercial_development"   = "Residential & Commercial Development",
+                     "Energy_production_&_mining"             = "Energy Production & Mining",
+                     "Transportation_&_service_corridors"     = "Transportation & Service Corridors",
+                     "Human_intrusions_&_disturbance"         = "Human Intrusions & Disturbance",
+                     "Climate_change_&_severe_weather"        = "Climate Change & Severe Weather",
+                     "Pollution"                              = "Pollution"
+)
+
+# Re-apply factor order after recoding (Total Threats must stay first)
+data$Model <- factor(data$Model, levels = c(
+  "Total Threats Model",
+  "Agriculture & Aquaculture",
+  "Biological Resource Use",
+  "Residential & Commercial Development",
+  "Energy Production & Mining",
+  "Transportation & Service Corridors",
+  "Human Intrusions & Disturbance",
+  "Climate Change & Severe Weather",
+  "Pollution"
+))
+
+# Update colors to match new model names
+colors <- c("Total Threats Model" = "black")
+colors <- c(colors, setNames(colorful_palette, 
+                             c("Agriculture & Aquaculture",
+                               "Biological Resource Use",
+                               "Residential & Commercial Development",
+                               "Energy Production & Mining",
+                               "Transportation & Service Corridors",
+                               "Human Intrusions & Disturbance",
+                               "Climate Change & Severe Weather",
+                               "Pollution")))
 
 ```
 
@@ -58,23 +105,35 @@ data <- data %>%
                              Effect_size - SE - 0.1))
 
 # Build the final plot
-ggplot(data, aes(x = Predictor, y = Effect_size, fill = Model)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
-  geom_errorbar(aes(ymin = Effect_size - SE, ymax = Effect_size + SE),
-                position = position_dodge(width = 0.8), width = 0.25) +
+p1 <- ggplot(data, aes(x = Predictor, y = Effect_size, fill = Model)) +
+  geom_bar(stat = "identity",
+           position = position_dodge(width = 0.8),
+           width = 0.7) +
+  geom_errorbar(aes(ymin = Effect_size - SE,
+                    ymax = Effect_size + SE),
+                position = position_dodge(width = 0.8),
+                width = 0.25) +
   geom_text(aes(y = asterisk_y, label = Significance),
             position = position_dodge(width = 0.8),
-            angle = 90,            # Upright asterisks
+            angle = 90,
             size = 6,
             fontface = "bold",
             color = "red3",
-            hjust = -0.05) +        # Shift slightly outward
-  labs(title = "Effect Sizes of Predictors by Threat Model",
-       y = "Effect Size", x = "Predictor", fill = "Threat Models") +
+            hjust = -0.05) +
+  labs(
+    y = "Effect Size",
+    x = "Predictor",
+    fill = "Threat Models"
+  ) +
   scale_fill_manual(values = colors) +
   theme_minimal(base_size = 18) +
   theme(
-    axis.text.x = element_text(angle = 45, size = 14, hjust = 1),
+    axis.text.x = element_text(
+      angle = 52,
+      size = 14,
+      hjust = 1,
+      face = "plain"
+    ),
     axis.line = element_line(color = "black"),
     axis.ticks = element_line(color = "black"),
     panel.grid.major.x = element_blank(),
@@ -82,7 +141,16 @@ ggplot(data, aes(x = Predictor, y = Effect_size, fill = Model)) +
     legend.position = "right"
   )
 
+p1
 
+ggsave(
+  "Fig1_raw_effects.jpeg",
+  plot = p1,
+  width = 14,
+  height = 8,
+  dpi = 300,
+  
+)
 
 ```
 
@@ -96,23 +164,51 @@ data <- data %>%
                              Std_Effect_size - SE - 0.1))
 
 # Build the final plot
-ggplot(data, aes(x = Predictor, y = Std_Effect_size, fill = Model)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
-  geom_errorbar(aes(ymin = Std_Effect_size - Std_SE, ymax = Std_Effect_size + Std_SE),
-                position = position_dodge(width = 0.8), width = 0.25) +
-  geom_text(aes(y = asterisk_y, label = Significance),
-            position = position_dodge(width = 0.8),
-            angle = 90,            # Upright asterisks
-            size = 6,
-            fontface = "bold",
-            color = "red3",
-            hjust = -0.05) +        # Shift slightly outward
-  labs(title = "Standardized Effect Sizes of Predictors by Threat Model",
-       y = "Std Effect Size", x = "Predictor", fill = "Threat Models") +
+p2 <- ggplot(
+  data_std,
+  aes(x = Predictor,
+      y = Std_Effect_size,
+      fill = Model)
+) +
+  geom_bar(
+    stat = "identity",
+    position = position_dodge(width = 0.8),
+    width = 0.7
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = Std_Effect_size - Std_SE,
+      ymax = Std_Effect_size + Std_SE
+    ),
+    position = position_dodge(width = 0.8),
+    width = 0.25
+  ) +
+  geom_text(
+    aes(
+      y = asterisk_y,
+      label = Significance
+    ),
+    position = position_dodge(width = 0.8),
+    angle = 90,
+    size = 6,
+    fontface = "bold",
+    color = "red3",
+    hjust = -0.05
+  ) +
+  labs(
+    y = "Standardized Effect Size",
+    x = "Predictor",
+    fill = "Threat Models"
+  ) +
   scale_fill_manual(values = colors) +
   theme_minimal(base_size = 18) +
   theme(
-    axis.text.x = element_text(angle = 45, size = 14, hjust = 1),
+    axis.text.x = element_text(
+      angle = 52,
+      size = 14,
+      hjust = 1,
+      face = "plain"
+    ),
     axis.line = element_line(color = "black"),
     axis.ticks = element_line(color = "black"),
     panel.grid.major.x = element_blank(),
@@ -120,35 +216,17 @@ ggplot(data, aes(x = Predictor, y = Std_Effect_size, fill = Model)) +
     legend.position = "right"
   )
 
+# Display plot
+p2
 
-```
-
-```{r}
-
-
-
-```
-
-```{r}
-
-
-
-```
-
-```{r}
-
-
-
-```
-
-```{r}
-
-
-
-```
-
-```{r}
-
+# Save Figure 2
+ggsave(
+  filename = "Fig2_std_effects.jpeg",
+  plot = p2,
+  width = 14,
+  height = 8,
+  dpi = 300,
+)
 
 
 ```
